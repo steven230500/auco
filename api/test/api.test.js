@@ -6,7 +6,9 @@ import { createService, auditEvent } from '../src/service.js';
 import { createEnricher } from '../src/enrichment.js';
 
 const id = 'c1fa302d-afbb-4f00-a1f3-5c9d9ff90b01';
-function setup({ auditFails = false, mongoFails = false, enrich = async () => ({ source: 'agify', estimatedAge: 44, sampleCount: 10 }) } = {}) {
+const rate = { base: 'USD', quote: 'COP', rate: 3311.44, date: '2026-11-18' };
+const enrichment = { source: 'frankfurter', ...rate };
+function setup({ auditFails = false, mongoFails = false, enrich = async () => enrichment } = {}) {
   const records = new Map(); const events = [];
   const repository = {
     async insert(record) { if (mongoFails) throw new Error('secret database credentials'); records.set(record.id, { ...record }); },
@@ -25,18 +27,20 @@ test('POST enriches, persists, audits and GET returns the record', async () => {
   assert.deepEqual(post.body, { id }); assert.equal(post.headers.location, `/validations/${id}`);
   const get = await request(app).get(`/validations/${id}`).expect(200);
   assert.equal(get.body.name, 'Ana María'); assert.equal(get.body.documentNumber, '0012345');
-  assert.equal(get.body.auditStatus, 'completed'); assert.equal(get.body.enrichment.estimatedAge, 44);
+  assert.equal(get.body.auditStatus, 'completed'); assert.deepEqual(get.body.enrichment, enrichment);
   assert.deepEqual(events[0], auditEvent(records.get(id)));
   assert.equal(events[0].pk, 'DOCUMENT#0012345');
   assert.equal(events[0].sk, `2026-11-18T12:00:00.000Z#${id}`);
 });
 
-test('invalid inputs never persist or audit', async () => {
-  const { app, records, events } = setup();
+test('invalid inputs never enrich, persist or audit', async () => {
+  let enrichmentCalls = 0;
+  const { app, records, events } = setup({ enrich: async () => { enrichmentCalls++; } });
   for (const body of [{}, { ...input, documentNumber: 12345 }, { ...input, name: '$bad' },
     { ...input, documentNumber: '1' }, { ...input, unexpected: true }, []]) {
     await request(app).post('/validations').send(body).expect(400);
   }
+  assert.equal(enrichmentCalls, 0);
   assert.equal(records.size, 0); assert.equal(events.length, 0);
 });
 
@@ -68,19 +72,24 @@ test('upstream HTTP, network, malformed response and timeout do not write', asyn
   }
 });
 
-test('enrichment validates response and sends only the first name', async () => {
+test('enrichment sends only the fixed currency pair and retains the reference rate', async () => {
   const enrich = createEnricher({ fetchImpl: async (url, options) => {
-    assert.equal(new URL(url).hostname, 'api.agify.io'); assert.ok(options.signal);
-    assert.equal(new URL(url).searchParams.get('name'), 'Ana');
-    assert.ok(!url.includes('0012345')); assert.ok(!url.includes('María'));
-    return { ok: true, json: async () => ({ name: 'Ana', age: 44, count: 10, ignored: true }) };
+    assert.equal(url, 'https://api.frankfurter.dev/v2/rate/USD/COP');
+    assert.deepEqual(Object.keys(options).sort(), ['redirect', 'signal']);
+    assert.equal(options.redirect, 'error');
+    assert.ok(options.signal);
+    return { ok: true, json: async () => ({ ...rate, ignored: true }) };
   } });
-  assert.deepEqual(await enrich({ name: 'Ana María' }), { source: 'agify', estimatedAge: 44, sampleCount: 10 });
+  assert.deepEqual(await enrich(input), enrichment);
 });
 
-test('no age prediction is a valid enrichment response', async () => {
-  const enrich = createEnricher({ fetchImpl: async () => ({ ok: true, json: async () => ({ name: 'Ana', age: null, count: 0 }) }) });
-  assert.equal((await enrich({ name: 'Ana' })).estimatedAge, null);
+test('enrichment rejects invalid currency pairs, rates and observation dates', async () => {
+  for (const overrides of [{ base: 'EUR' }, { quote: 'USD' }, { rate: 0 }, { rate: -1 },
+    { rate: '3311.44' }, { rate: Infinity }, { date: 'bad-date' }, { date: '2026-02-30' },
+    { date: '2026-11-18T00:00:00Z' }]) {
+    const enrich = createEnricher({ fetchImpl: async () => ({ ok: true, json: async () => ({ ...rate, ...overrides }) }) });
+    await assert.rejects(enrich(input), { status: 502, code: 'ENRICHMENT_UNAVAILABLE' });
+  }
 });
 
 test('audit failure leaves pending record and returns recoverable id without 201', async () => {

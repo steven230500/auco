@@ -25,7 +25,7 @@ export function createService({ repository, audit, enrich, clock = () => new Dat
   return {
     async create(input) {
       const normalized = validateInput(input);
-      const enrichment = await enrich(normalized);
+      const enrichment = await enrich();
       const record = { id: id(), ...normalized, enrichment, createdAt: clock().toISOString(), auditStatus: 'pending' };
       await repository.insert(record);
       try {

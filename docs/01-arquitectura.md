@@ -1,6 +1,6 @@
 # Arquitectura y consistencia
 
-Flujo: HTTP → validación → Agify (primer nombre) → inserción MongoDB pendiente → PutItem DynamoDB → confirmación MongoDB → HTTP 201.
+Flujo: HTTP → validación → Frankfurter (USD/COP) → inserción MongoDB pendiente → PutItem DynamoDB → confirmación MongoDB → HTTP 201.
 
 | Archivo | Dueño de la decisión |
 | --- | --- |
@@ -26,7 +26,7 @@ El evento guarda `eventType`, `validationId` y `createdAt`, sin nombre ni respue
 
 No existe transacción atómica entre estas bases. No se promete exactamente una ejecución global ni rollback distribuido.
 
-- Si falla Agify, no se escribe ninguna base.
+- Si falla Frankfurter, no se escribe ninguna base.
 - Si falla Mongo antes de confirmar la inserción, no se solicita auditoría. Un timeout ambiguo de Mongo puede haber insertado: quedaría pendiente y conciliable.
 - Si falla Dynamo tras la inserción, se devuelve 503 `AUDIT_PENDING`, con el id para consultar el registro guardado. No devolver 201 evita afirmar que ambas bases están completas.
 - Si Dynamo escribió pero la confirmación de Mongo falla, el registro sigue pendiente; reconciliar repite el mismo evento sin duplicarlo.

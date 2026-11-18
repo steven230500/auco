@@ -18,7 +18,7 @@ Respuesta 201 y cabecera `Location: /validations/<id>`:
 
 ## GET /validations/:id
 
-UUID v4 obligatorio. Respuesta 200 de ejemplo ilustrativo; la edad y la muestra reales dependen del proveedor:
+UUID v4 obligatorio. Ejemplo de respuesta 200 para un registro nuevo:
 
 ```json
 {
@@ -26,12 +26,12 @@ UUID v4 obligatorio. Respuesta 200 de ejemplo ilustrativo; la edad y la muestra 
   "name":"Ana María",
   "documentNumber":"0012345",
   "createdAt":"2026-11-18T12:00:00.000Z",
-  "enrichment":{"source":"agify","estimatedAge":44,"sampleCount":281360},
+  "enrichment":{"source":"frankfurter","base":"USD","quote":"COP","rate":3311.44,"date":"2026-11-18"},
   "auditStatus":"completed"
 }
 ```
 
-`estimatedAge` puede ser null cuando el proveedor no conoce el nombre. Es una estimación estadística y no sirve como prueba de edad. `auditStatus` puede ser `pending` si el registro se guardó y falta confirmar su auditoría.
+`rate` indica cuántos pesos colombianos (COP) corresponden a un dólar estadounidense (USD) según la tasa de referencia publicada para `date`. La fecha del proveedor puede ser anterior a `createdAt`. Los registros ya guardados devuelven su enriquecimiento original. `auditStatus` puede ser `pending` si el registro se guardó y falta confirmar su auditoría.
 
 | Estado | Código | Circunstancia |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ UUID v4 obligatorio. Respuesta 200 de ejemplo ilustrativo; la edad y la muestra 
 | 404 | `NOT_FOUND` | Registro o ruta inexistente |
 | 413 | `PAYLOAD_TOO_LARGE` | Más de 8kb |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | POST sin application/json |
-| 502 | `ENRICHMENT_UNAVAILABLE` | Red, cuota/HTTP o respuesta externa inválida |
+| 502 | `ENRICHMENT_UNAVAILABLE` | Error de red, estado HTTP externo de error o respuesta inválida |
 | 504 | `ENRICHMENT_TIMEOUT` | Consulta externa excede el plazo |
 | 503 | `AUDIT_PENDING` | Registro persistido, auditoría o confirmación pendiente |
 | 500 | `INTERNAL_ERROR` | Error de persistencia u otro fallo inesperado |
