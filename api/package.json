@@ -1,0 +1,27 @@
+{
+  "name": "auco-validations-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --watch --env-file=.env src/server.js",
+    "test": "node --test test/*.test.js",
+    "test:integration": "node --env-file=.env --test test/integration.js",
+    "db:init": "node --env-file=.env scripts/init-db.js",
+    "audit:reconcile": "node --env-file=.env scripts/reconcile.js",
+    "check": "node --check src/server.js && node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1171.0",
+    "@aws-sdk/lib-dynamodb": "^3.1171.0",
+    "express": "^5.3.0",
+    "mongodb": "^6.22.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.2"
+  }
+}
